@@ -1,0 +1,157 @@
+﻿@page "/"
+@using FlowerShop.Frontend.Models
+@inject HttpClient Http
+
+<PageTitle>Магазин цветов</PageTitle>
+
+<div class="container mt-4">
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold text-primary">Наши прекрасные букеты</h1>
+        <p class="lead text-muted">Свежие цветы с доставкой прямо к вашему порогу</p>
+    </div>
+
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> @errorMessage
+        </div>
+    }
+
+    @if (flowers == null && errorMessage == null)
+    {
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+            <p class="mt-2">Загружаем свежие цветы для вас...</p>
+        </div>
+    }
+    else if (flowers != null)
+    {
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            @foreach (var flower in flowers)
+            {
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0 flower-card">
+                        <img src="@(string.IsNullOrEmpty(flower.ImageUrl) ? "images/default.jpg" : flower.ImageUrl)"
+                             class="card-img-top" alt="@flower.Name"
+                             style="height: 250px; object-fit: cover;">
+
+                        <div class="card-body text-center">
+                            <h5 class="card-title fw-bold">@flower.Name</h5>
+                            <p class="card-text text-muted small">В наличии: @flower.Stock шт.</p>
+                            <h4 class="text-success fw-bold">@flower.Price ₽</h4>
+                        </div>
+
+                        <div class="card-footer bg-white border-0 pb-3">
+                            <button class="btn btn-primary w-100 rounded-pill py-2" @onclick="() => OpenOrderModal(flower)">
+                                <i class="bi bi-cart-plus me-2"></i>Заказать
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* Всплывающее окно оформления заказа (простая реализация через условие) *@
+@if (selectedFlower != null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Оформление заказа: @selectedFlower.Name</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ваше имя</label>
+                        <input type="text" @bind="newOrder.CustomerName" class="form-control" placeholder="Иван Иванов">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Телефон</label>
+                        <input type="text" @bind="newOrder.Phone" class="form-control" placeholder="+7 (999) 000-00-00">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Адрес доставки</label>
+                        <textarea @bind="newOrder.Address" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Отмена</button>
+                    <button type="button" class="btn btn-success px-4" @onclick="SubmitOrder">Подтвердить заказ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .flower-card {
+        transition: transform 0.3s ease;
+    }
+
+        .flower-card:hover {
+            transform: translateY(-10px);
+        }
+</style>
+
+@code {
+    private List<Product>? flowers;
+    private string? errorMessage;
+
+    // Поля для оформления заказа
+    private Product? selectedFlower;
+    private Order newOrder = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Убедитесь, что в API контроллер называется FlowersController
+            flowers = await Http.GetFromJsonAsync<List<Product>>("api/flowers");
+
+            if (flowers == null || flowers.Count == 0)
+            {
+                errorMessage = "На данный момент в магазине нет доступных цветов.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Не удалось загрузить данные. Проверьте, что API запущено на порту, указанном в Program.cs фронтенда.";
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void OpenOrderModal(Product flower)
+    {
+        selectedFlower = flower;
+        newOrder = new Order
+        {
+            Items = new List<string> { flower.Name },
+            TotalPrice = flower.Price,
+            Status = OrderStatus.New
+        };
+    }
+
+    private void CloseModal() => selectedFlower = null;
+
+    private async Task SubmitOrder()
+    {
+        if (string.IsNullOrWhiteSpace(newOrder.CustomerName) || string.IsNullOrWhiteSpace(newOrder.Address))
+        {
+            // Можно добавить проверку валидации
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/orders", newOrder);
+
+        if (response.IsSuccessStatusCode)
+        {
+            selectedFlower = null;
+            // Здесь можно добавить всплывающее уведомление об успехе
+        }
+    }
+}
