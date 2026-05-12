@@ -5,25 +5,34 @@ using Microsoft.AspNetCore.Mvc;
 [Route("api/admin")]
 public class AdminController : ControllerBase
 {
-    // Админ видит ВСЕ заказы без фильтров
-    [HttpGet("all-orders")]
-    public IActionResult GetAllOrders() => Ok(DataStorage.Orders);
+    private readonly AppDbContext _context;
 
-    // Управление ценами (чего не может флорист)
-    [HttpPatch("update-price/{flowerId}")]
-    public IActionResult UpdatePrice(int flowerId, [FromBody] decimal newPrice)
+    public AdminController(AppDbContext context)
     {
-        var flower = DataStorage.Products.FirstOrDefault(f => f.Id == flowerId);
-        if (flower == null) return NotFound();
-        flower.Price = newPrice;
-        return Ok();
+        _context = context;
     }
 
-    // Отчетность
     [HttpGet("stats")]
-    public IActionResult GetStats() => Ok(new
+    public IActionResult GetStats()
     {
-        TotalRevenue = DataStorage.Orders.Where(o => o.Status == OrderStatus.Completed).Sum(o => o.TotalPrice),
-        TotalOrders = DataStorage.Orders.Count
-    });
+        var stats = new
+        {
+            TotalRevenue = _context.Orders
+                .Where(o => o.Status == OrderStatus.Completed)
+                .Sum(o => o.TotalPrice),
+            TotalOrders = _context.Orders.Count()
+        };
+        return Ok(stats);
+    }
+
+    [HttpDelete("delete-order/{id}")]
+    public IActionResult DeleteOrder(int id)
+    {
+        var order = _context.Orders.Find(id);
+        if (order == null) return NotFound();
+
+        _context.Orders.Remove(order);
+        _context.SaveChanges();
+        return Ok();
+    }
 }

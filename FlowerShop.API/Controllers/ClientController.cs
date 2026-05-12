@@ -5,15 +5,24 @@ using Microsoft.AspNetCore.Mvc;
 [Route("api/shop")]
 public class ShopController : ControllerBase
 {
-    [HttpGet("flowers")] // Посмотреть витрину
-    public IActionResult GetFlowers() => Ok(DataStorage.Products);
+    private readonly AppDbContext _context;
+    public ShopController(AppDbContext context)
+    {
+        _context = context;
+    }
 
-    [HttpPost("checkout")] // Купить
+    [HttpGet("flowers")]
+    public IActionResult GetFlowers()
+    {
+        return Ok(_context.Products.Where(p => p.Stock > 0).ToList());
+    }
+
+    [HttpPost("checkout")]
     public IActionResult CreateOrder(Order order)
     {
-        order.Id = DataStorage.Orders.Count + 1;
         order.Status = OrderStatus.New;
-        DataStorage.Orders.Add(order);
-        return Ok(new { order.Id, Message = "Заказ принят!" });
+        _context.Orders.Add(order);
+        _context.SaveChanges();   
+        return Ok(new { order.Id, Message = "Заказ принят и сохранен в базе!" });
     }
 }
