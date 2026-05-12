@@ -22,6 +22,6 @@
         Assembling,
         Ready,
         Delivering,
-        Complited
+        Completed
     }
 }
